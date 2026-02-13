@@ -21,43 +21,115 @@ class BootScene extends Phaser.Scene {
 class TitleScene extends Phaser.Scene {
     constructor() { super('Title'); }
     create() {
-        // Background stars
+        // Dark gradient background
+        const bgGfx = this.add.graphics().setDepth(-10);
+        for (let y = 0; y < CFG.H; y++) {
+            const t = y / CFG.H;
+            bgGfx.fillStyle(Phaser.Display.Color.GetColor(
+                Math.floor(6 + t * 8), Math.floor(6 + t * 8), Math.floor(14 + t * 18)
+            ), 1);
+            bgGfx.fillRect(0, y, CFG.W, 1);
+        }
+
+        // Nebula blobs
+        const nebulaGfx = this.add.graphics().setDepth(-8);
+        for (let i = 0; i < 12; i++) {
+            nebulaGfx.fillStyle(
+                Phaser.Display.Color.HSLToColor((220 + Math.random() * 40) / 360, 0.25, 0.06 + Math.random() * 0.04).color,
+                0.2 + Math.random() * 0.15
+            );
+            nebulaGfx.fillEllipse(
+                Math.random() * CFG.W, Math.random() * CFG.H,
+                100 + Math.random() * 200, 40 + Math.random() * 100
+            );
+        }
+
+        // Stars (3 speed layers)
         this.stars = [];
-        for (let i = 0; i < 120; i++) {
+        for (let i = 0; i < 150; i++) {
+            const layer = i < 50 ? 0 : i < 100 ? 1 : 2;
+            const size = [0.5, 1.0, 1.8][layer] + Math.random() * [0.5, 1.0, 1.5][layer];
+            const alpha = [0.3, 0.5, 0.8][layer] + Math.random() * 0.2;
+            const tint = layer === 2 ? 0xffffff : Phaser.Display.Color.HSLToColor(
+                (210 + Math.random() * 30) / 360, 0.2, 0.4 + layer * 0.15
+            ).color;
             const s = this.add.circle(
                 Math.random() * CFG.W, Math.random() * CFG.H,
-                0.5 + Math.random() * 1.5, 0xffffff, 0.3 + Math.random() * 0.7
-            );
-            s.speed = 0.3 + Math.random() * 1.5;
+                size, tint, alpha
+            ).setDepth(-5 + layer);
+            s.speed = [0.2, 0.6, 1.4][layer] + Math.random() * [0.2, 0.5, 1.0][layer];
             this.stars.push(s);
         }
-        // Title
-        this.add.text(CFG.W / 2, 140, GAME_TITLE, {
-            fontSize: '72px', fontFamily: 'Impact, sans-serif',
-            fill: '#8899cc', stroke: '#334466', strokeThickness: 6,
+
+        // Title with glow effect
+        const titleShadow = this.add.text(CFG.W / 2, 132, GAME_TITLE, {
+            fontSize: '80px', fontFamily: 'Impact, sans-serif',
+            fill: '#223355', stroke: '#112233', strokeThickness: 10,
+        }).setOrigin(0.5).setAlpha(0.5);
+        const titleMain = this.add.text(CFG.W / 2, 130, GAME_TITLE, {
+            fontSize: '80px', fontFamily: 'Impact, sans-serif',
+            fill: '#aabbdd', stroke: '#334466', strokeThickness: 6,
         }).setOrigin(0.5);
-        this.add.text(CFG.W / 2, 210, '\u30D1\u30ED\u30C7\u30A3\u30A6\u30B9', {
+        // Title breathing animation
+        this.tweens.add({
+            targets: titleMain, y: titleMain.y - 4,
+            duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+        });
+        this.tweens.add({
+            targets: titleShadow, y: titleShadow.y - 4,
+            duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+        });
+
+        // Katakana subtitle
+        this.add.text(CFG.W / 2, 215, '\u30D1\u30ED\u30C7\u30A3\u30A6\u30B9', {
             fontSize: '24px', fontFamily: 'sans-serif', fill: '#6688aa'
         }).setOrigin(0.5);
-        this.add.text(CFG.W / 2, 270, GAME_VERSION, {
-            fontSize: '14px', fontFamily: 'monospace', fill: '#556688'
+
+        // Version
+        this.add.text(CFG.W / 2, 255, GAME_VERSION, {
+            fontSize: '12px', fontFamily: 'monospace', fill: '#445577'
         }).setOrigin(0.5);
-        // Start prompt
-        this.startText = this.add.text(CFG.W / 2, 390, 'PRESS ENTER OR SPACE', {
-            fontSize: '22px', fontFamily: 'monospace', fill: '#ffffff'
-        }).setOrigin(0.5);
-        // Blink
-        this.tweens.add({
-            targets: this.startText, alpha: 0, yoyo: true,
-            repeat: -1, duration: 500, ease: 'Sine.easeInOut'
+
+        // Decorative line
+        const lineGfx = this.add.graphics();
+        lineGfx.lineStyle(1, 0x445588, 0.4);
+        lineGfx.lineBetween(CFG.W * 0.2, 280, CFG.W * 0.8, 280);
+
+        // Ship preview (cycle through ships)
+        this.previewShips = CHARACTERS.map((ch, i) => {
+            return this.add.image(
+                CFG.W / 2 - 100 + i * 66, 320, ch.id
+            ).setScale(1.5).setAlpha(0.6);
         });
-        // Controls info
-        this.add.text(CFG.W / 2, 460, 'WASD / Arrows: Move    Z: Shoot    X: Activate Power-Up', {
-            fontSize: '13px', fontFamily: 'monospace', fill: '#666699'
+        this.tweens.add({
+            targets: this.previewShips,
+            alpha: { from: 0.4, to: 0.8 },
+            duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+        });
+
+        // Start prompt with glow
+        this.startText = this.add.text(CFG.W / 2, 400, 'PRESS ENTER OR SPACE', {
+            fontSize: '22px', fontFamily: 'monospace',
+            fill: '#ffffff', stroke: '#223366', strokeThickness: 3
         }).setOrigin(0.5);
-        this.add.text(CFG.W / 2, 485, 'C: Missile    ESC: Pause', {
-            fontSize: '13px', fontFamily: 'monospace', fill: '#666699'
+        this.tweens.add({
+            targets: this.startText, alpha: 0.15, yoyo: true,
+            repeat: -1, duration: 600, ease: 'Sine.easeInOut'
+        });
+
+        // Controls
+        this.add.text(CFG.W / 2, 460, 'WASD / Arrows: Move    Z: Shoot    X: Power-Up    C: Missile', {
+            fontSize: '12px', fontFamily: 'monospace', fill: '#556688'
         }).setOrigin(0.5);
+        this.add.text(CFG.W / 2, 480, 'ESC / P: Pause', {
+            fontSize: '12px', fontFamily: 'monospace', fill: '#556688'
+        }).setOrigin(0.5);
+
+        // Credits
+        this.add.text(CFG.W / 2, CFG.H - 16, 'Built by Ben Hardin', {
+            fontSize: '10px', fontFamily: 'monospace', fill: '#334466'
+        }).setOrigin(0.5);
+
         // Input
         this.input.keyboard.once('keydown-SPACE', () => this.go());
         this.input.keyboard.once('keydown-ENTER', () => this.go());
@@ -806,6 +878,22 @@ class GameScene extends Phaser.Scene {
             if (this.cursors.down.isDown || this.keyS.isDown) vy = spd;
             this.player.setVelocity(vx, vy);
 
+            // Clamp player Y within terrain corridor
+            const t = this.stageData.terrain;
+            const pad = 12;
+            let minY = 36 + pad;
+            let maxY = CFG.H - pad;
+            if (t.top) {
+                const topY = this.getTerrainYTop(this.player.x);
+                minY = Math.max(minY, topY + pad);
+            }
+            if (t.bottom) {
+                const botY = this.getTerrainYBottom(this.player.x);
+                maxY = Math.min(maxY, botY - pad);
+            }
+            if (maxY < minY) { const mid = (minY + maxY) * 0.5; minY = mid - 1; maxY = mid + 1; }
+            this.player.y = Phaser.Math.Clamp(this.player.y, minY, maxY);
+
             // Trail for options
             this.trail.push(this.player.x, this.player.y);
 
@@ -965,20 +1053,26 @@ class GameScene extends Phaser.Scene {
     fireMissile() {
         sfx.shoot();
         const mt = this.char.missileType;
-        if (mt === 'spread') {
-            [-1, 1].forEach(dir => {
-                this.spawnMissile(this.player.x, this.player.y + dir * 10, 200, dir * 150);
-            });
-        } else if (mt === 'vertical') {
-            [-1, 1].forEach(dir => {
-                this.spawnMissile(this.player.x, this.player.y + dir * 10, 50, dir * 200);
-            });
-        } else if (mt === 'forward') {
-            this.spawnMissile(this.player.x + 15, this.player.y, 350, 0);
-        } else {
-            // Default down missile
-            this.spawnMissile(this.player.x, this.player.y + 12, 150, 200);
-        }
+        const fireMissileFrom = (ox, oy) => {
+            if (mt === 'spread') {
+                [-1, 1].forEach(dir => {
+                    this.spawnMissile(ox, oy + dir * 10, 200, dir * 150);
+                });
+            } else if (mt === 'vertical') {
+                [-1, 1].forEach(dir => {
+                    this.spawnMissile(ox, oy + dir * 10, 50, dir * 200);
+                });
+            } else if (mt === 'forward') {
+                this.spawnMissile(ox + 15, oy, 350, 0);
+            } else {
+                this.spawnMissile(ox, oy + 12, 150, 200);
+            }
+        };
+        fireMissileFrom(this.player.x, this.player.y);
+        // Options also fire missiles
+        this.options.forEach(opt => {
+            fireMissileFrom(opt.x, opt.y);
+        });
     }
 
     spawnBullet(x, y, vx, vy) {
@@ -1237,7 +1331,14 @@ class GameScene extends Phaser.Scene {
         this.spawnExplosion(enemy.x, enemy.y);
         this.spawnDeathParticles(enemy.x, enemy.y, enemy.def ? enemy.def.hue : 210);
         sfx.explosion();
-        this.shakeMag = Math.max(this.shakeMag, 2);
+        // Scale shake with enemy toughness
+        const maxHP = enemy.def ? enemy.def.hp : 1;
+        const shakeAmount = maxHP >= 5 ? 6 : maxHP >= 3 ? 4 : 2;
+        this.shakeMag = Math.max(this.shakeMag, shakeAmount);
+        if (maxHP >= 5) {
+            sfx.bigExplosion();
+            this.spawnExplosion(enemy.x + (Math.random() - 0.5) * 20, enemy.y + (Math.random() - 0.5) * 20);
+        }
 
         // Score text with combo info
         if (this.comboMultiplier > 1) {
@@ -1428,6 +1529,9 @@ class GameScene extends Phaser.Scene {
         this.bossShootTimer = 0;
         this.bossBulletAngle = 0;
         sfx.bossWarning();
+        // Switch to intense boss music
+        const bossBaseNote = 185 + (this.stageIdx % 4) * 15;
+        sfx.startMusic(170, bossBaseNote, 'tense');
 
         // --- WARNING overlay ---
         const warnBg = this.add.rectangle(CFG.W / 2, CFG.H / 2, CFG.W, CFG.H, 0x000000, 0)
@@ -1664,6 +1768,8 @@ class GameScene extends Phaser.Scene {
             this.bossActive = false;
             this.shakeMag = 15;
             this.cameras.main.flash(500, 255, 200, 100);
+            // Stop boss music, play victory fanfare
+            sfx.stopMusic();
             sfx.stageClear();
             this.floatText(CFG.W / 2, CFG.H / 2, 'STAGE CLEAR!', '#8899cc', 40);
 
@@ -1715,7 +1821,7 @@ class GameScene extends Phaser.Scene {
         const t = this.add.text(x, y, text, {
             fontSize: `${size || 16}px`, fontFamily: 'monospace',
             fill: color || '#ffffff', stroke: '#000000', strokeThickness: 2
-        }).setOrigin(0.5).setDepth(50).setScrollFactor(0);
+        }).setOrigin(0.5).setDepth(50);
         this.tweens.add({
             targets: t, y: y - 50, alpha: 0,
             duration: 1200, ease: 'Cubic.easeOut',
