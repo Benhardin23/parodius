@@ -131,7 +131,7 @@ class SelectScene extends Phaser.Scene {
     }
     confirm() {
         sfx.menuSelect();
-        this.scene.start('Game', { characterIndex: this.selected, stageIndex: 0, score: 0, lives: CFG.START_LIVES });
+        this.scene.start('Game', { characterIndex: this.selected, stageIndex: 0, loopCount: 0, score: 0, lives: CFG.START_LIVES });
     }
 }
 
@@ -142,6 +142,7 @@ class GameScene extends Phaser.Scene {
     init(data) {
         this.charIdx = data.characterIndex || 0;
         this.stageIdx = data.stageIndex || 0;
+        this.loopCount = data.loopCount || 0;
         this.score = data.score || 0;
         this.lives = data.lives !== undefined ? data.lives : CFG.START_LIVES;
         this.hiScore = parseInt(localStorage.getItem('parodius_hi') || '0');
@@ -330,8 +331,11 @@ class GameScene extends Phaser.Scene {
             fontSize: '20px', fontFamily: 'sans-serif', fill: '#ff5555',
             stroke: '#000000', strokeThickness: 2,
         }).setOrigin(0, 0).setDepth(hd).setScrollFactor(0);
-        // Stage
-        this.add.text(14, 2, `STAGE ${this.stageIdx + 1}`, {
+        // Stage + Loop
+        const stageLabel = this.loopCount > 0
+            ? `STAGE ${this.stageIdx + 1}  LOOP ${this.loopCount + 1}`
+            : `STAGE ${this.stageIdx + 1}`;
+        this.add.text(14, 2, stageLabel, {
             fontSize: '8px', fontFamily: 'sans-serif', fill: '#6677aa', letterSpacing: 2,
         }).setOrigin(0, 0).setDepth(hd).setScrollFactor(0);
 
@@ -758,14 +762,17 @@ class GameScene extends Phaser.Scene {
         if (!e) return;
         e.setActive(true).setVisible(true).setDepth(5);
         e.body.setSize(def.size * 0.8, def.size * 0.8);
-        e.hp = def.hp;
-        e.score = def.score;
+        // NG+ scaling
+        const loopMul = 1 + this.loopCount * 0.25;
+        e.hp = Math.max(1, Math.ceil(def.hp * loopMul));
+        e.score = Math.ceil(def.score * loopMul);
         e.typeKey = typeKey;
         e.def = def;
         e.spawnY = y;
         e.age = 0;
-        e.shootCD = def.shootCD || 9999;
-        e.shootTimer = Math.random() * (def.shootCD || 9999);
+        const baseCD = def.shootCD || 9999;
+        e.shootCD = Math.max(400, Math.floor(baseCD / loopMul));
+        e.shootTimer = Math.random() * e.shootCD;
         e.frameIdx = 0;
         e.frameTimer = 0;
         e.dropRate = def.drop;
@@ -1002,7 +1009,8 @@ class GameScene extends Phaser.Scene {
                 sfx.stopMusic();
                 this.scene.start('GameOver', {
                     score: this.score, hiScore: this.hiScore,
-                    stage: this.stageIdx + 1, characterIndex: this.charIdx
+                    stage: this.stageIdx + 1, characterIndex: this.charIdx,
+                    loopCount: this.loopCount
                 });
             });
         } else {
@@ -1034,9 +1042,12 @@ class GameScene extends Phaser.Scene {
     startBoss(bossIdx) {
         this.bossActive = true;
         const bd = BOSSES[bossIdx % BOSSES.length];
-        this.bossMaxHP = bd.hp;
-        this.bossHP = bd.hp;
-        this.bossBarrierMax = bd.barriers * bd.barrierHP;
+        // NG+ scaling
+        const loopMul = 1 + this.loopCount * 0.25;
+        this.bossMaxHP = Math.ceil(bd.hp * loopMul);
+        this.bossHP = this.bossMaxHP;
+        const scaledBarrierHP = Math.ceil(bd.barrierHP * loopMul);
+        this.bossBarrierMax = bd.barriers * scaledBarrierHP;
         this.bossBarrierHP = this.bossBarrierMax;
         this.bossPhaseIdx = 0;
         this.bossShootTimer = 0;
@@ -1245,26 +1256,24 @@ class GameScene extends Phaser.Scene {
 
             this.stageClear = true;
             const nextStage = this.stageIdx + 1;
+            const hasMoreStages = nextStage < STAGES.length;
+
             const transitionData = {
                 characterIndex: this.charIdx,
-                stageIndex: nextStage,
+                stageIndex: hasMoreStages ? nextStage : 0,
+                loopCount: hasMoreStages ? this.loopCount : this.loopCount + 1,
                 score: this.score,
                 lives: this.lives
             };
-            const victoryData = {
-                score: this.score, hiScore: this.hiScore,
-                stage: this.stageIdx + 1, characterIndex: this.charIdx,
-                victory: true
-            };
-            const hasMoreStages = nextStage < STAGES.length;
 
             this.time.delayedCall(CFG.STAGE_CLEAR_TIME, () => {
                 sfx.stopMusic();
-                if (hasMoreStages) {
-                    this.scene.restart(transitionData);
-                } else {
-                    this.scene.start('GameOver', victoryData);
+                if (!hasMoreStages) {
+                    this.floatText(CFG.W / 2, CFG.H / 2 - 60, `ENTERING LOOP ${this.loopCount + 2}`, '#ffcc44', 28);
                 }
+                this.time.delayedCall(hasMoreStages ? 0 : 1500, () => {
+                    this.scene.restart(transitionData);
+                });
             });
         });
     }
@@ -1310,6 +1319,7 @@ class GameOverScene extends Phaser.Scene {
         this.hiScore = data.hiScore || 0;
         this.stage = data.stage || 1;
         this.charIdx = data.characterIndex || 0;
+        this.loopCount = data.loopCount || 0;
         this.victory = data.victory || false;
     }
     create() {
@@ -1331,7 +1341,10 @@ class GameOverScene extends Phaser.Scene {
                 fontSize: '56px', fontFamily: 'Impact, sans-serif',
                 fill: '#ff4444', stroke: '#880000', strokeThickness: 5
             }).setOrigin(0.5);
-            this.add.text(CFG.W / 2, 160, `Made it to Stage ${this.stage}`, {
+            const stageInfo = this.loopCount > 0
+                ? `Made it to Stage ${this.stage} (Loop ${this.loopCount + 1})`
+                : `Made it to Stage ${this.stage}`;
+            this.add.text(CFG.W / 2, 160, stageInfo, {
                 fontSize: '16px', fontFamily: 'monospace', fill: '#aaaacc'
             }).setOrigin(0.5);
         }
@@ -1354,14 +1367,16 @@ class GameOverScene extends Phaser.Scene {
         this.add.text(CFG.W / 2, 430, 'PRESS T FOR TITLE SCREEN', {
             fontSize: '14px', fontFamily: 'monospace', fill: '#666688'
         }).setOrigin(0.5);
+        const retryData = {
+            characterIndex: this.charIdx,
+            stageIndex: Math.max((this.stage - 1), 0),
+            loopCount: this.loopCount,
+            score: 0,
+            lives: CFG.START_LIVES
+        };
         this.input.keyboard.on('keydown-ENTER', () => {
             sfx.menuSelect();
-            this.scene.start('Game', {
-                characterIndex: this.charIdx,
-                stageIndex: this.victory ? 0 : Math.max((this.stage - 1), 0),
-                score: 0,
-                lives: CFG.START_LIVES
-            });
+            this.scene.start('Game', retryData);
         });
         this.input.keyboard.on('keydown-T', () => {
             sfx.menuSelect();
@@ -1369,12 +1384,7 @@ class GameOverScene extends Phaser.Scene {
         });
         this.input.keyboard.on('keydown-SPACE', () => {
             sfx.menuSelect();
-            this.scene.start('Game', {
-                characterIndex: this.charIdx,
-                stageIndex: this.victory ? 0 : Math.max((this.stage - 1), 0),
-                score: 0,
-                lives: CFG.START_LIVES
-            });
+            this.scene.start('Game', retryData);
         });
     }
 }
