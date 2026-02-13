@@ -240,7 +240,7 @@ function generateAssets(scene) {
         ctx.stroke();
     });
 
-    // ---- Enemy sprites — mechanical vs organic ----
+    // ---- Enemy sprites — detailed mechanical & organic ----
     Object.entries(ENEMIES).forEach(([key, def]) => {
         const s = def.size;
         const isOrganic = def.hue >= 140 && def.hue <= 320;
@@ -252,73 +252,190 @@ function generateAssets(scene) {
                 const r = s * 0.42 * pulse;
 
                 if (isOrganic) {
-                    // Organic style — rounded membrane, radial gradient, nucleus
-                    drawGlow(ctx, cx, cy, r + 4, def.hue, 0.2);
+                    // Organic: membrane body with tendrils and internal structures
+                    drawGlow(ctx, cx, cy, r + 6, def.hue, 0.25);
+
+                    // Outer membrane (irregular edge)
                     ctx.beginPath();
-                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                    ctx.closePath();
-                    const g = ctx.createRadialGradient(cx - r*0.2, cy - r*0.2, r*0.1, cx, cy, r);
-                    g.addColorStop(0, `hsl(${def.hue},40%,55%)`);
-                    g.addColorStop(0.5, `hsl(${def.hue},35%,35%)`);
-                    g.addColorStop(1, `hsla(${def.hue},30%,20%,0.3)`);
-                    ctx.fillStyle = g;
-                    ctx.fill();
-                    // Internal nucleus (off-center bright dot)
-                    const nx = cx - r * 0.15 + Math.sin(t * Math.PI * 2) * 2;
-                    const ny = cy - r * 0.1;
-                    ctx.fillStyle = `hsl(${def.hue},50%,65%)`;
-                    ctx.beginPath();
-                    ctx.arc(nx, ny, r * 0.2, 0, Math.PI * 2);
-                    ctx.fill();
-                } else {
-                    // Mechanical style — angular hexagonal frame
-                    drawGlow(ctx, cx, cy, r + 4, def.hue, 0.15);
-                    ctx.beginPath();
-                    const sides = 6;
-                    for (let a = 0; a <= Math.PI * 2 + 0.01; a += Math.PI * 2 / sides) {
-                        const wobble = Math.sin(a * 3 + t * Math.PI * 6) * 2;
+                    for (let a = 0; a < Math.PI * 2; a += 0.15) {
+                        const wobble = Math.sin(a * 5 + t * Math.PI * 4) * r * 0.08;
                         const rr = r + wobble;
-                        const x = cx + Math.cos(a) * rr;
-                        const y = cy + Math.sin(a) * rr;
-                        if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        const px = cx + Math.cos(a) * rr;
+                        const py = cy + Math.sin(a) * rr;
+                        if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
                     }
                     ctx.closePath();
-                    // Dark base with colored inner panel
                     const g = ctx.createRadialGradient(cx - r*0.2, cy - r*0.2, r*0.1, cx, cy, r);
-                    g.addColorStop(0, `hsl(${def.hue},35%,45%)`);
-                    g.addColorStop(0.4, '#1a1a2a');
-                    g.addColorStop(1, '#0e0e1a');
+                    g.addColorStop(0, `hsl(${def.hue},45%,55%)`);
+                    g.addColorStop(0.4, `hsl(${def.hue},40%,38%)`);
+                    g.addColorStop(0.8, `hsl(${def.hue},35%,22%)`);
+                    g.addColorStop(1, `hsla(${def.hue},30%,15%,0.2)`);
                     ctx.fillStyle = g;
                     ctx.fill();
-                    ctx.strokeStyle = 'rgba(100,120,150,0.3)';
+                    // Membrane edge highlight
+                    ctx.strokeStyle = `hsla(${def.hue},50%,55%,0.3)`;
                     ctx.lineWidth = 1;
                     ctx.stroke();
-                    // Panel seam lines
-                    ctx.strokeStyle = 'rgba(100,120,150,0.3)';
+
+                    // Internal veins/structures
+                    ctx.strokeStyle = `hsla(${def.hue},40%,45%,0.25)`;
+                    ctx.lineWidth = 0.8;
+                    for (let v = 0; v < 4; v++) {
+                        const va = (v / 4) * Math.PI * 2 + t * 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy);
+                        const vx = cx + Math.cos(va) * r * 0.75;
+                        const vy = cy + Math.sin(va) * r * 0.75;
+                        ctx.quadraticCurveTo(
+                            cx + Math.cos(va + 0.4) * r * 0.4,
+                            cy + Math.sin(va + 0.4) * r * 0.4,
+                            vx, vy
+                        );
+                        ctx.stroke();
+                    }
+
+                    // Nucleus (pulsing, off-center)
+                    const nx = cx - r * 0.12 + Math.sin(t * Math.PI * 2) * 2.5;
+                    const ny = cy - r * 0.08 + Math.cos(t * Math.PI * 2) * 1.5;
+                    const nR = r * 0.22 * (1 + Math.sin(t * Math.PI * 4) * 0.1);
+                    const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, nR);
+                    ng.addColorStop(0, `hsl(${def.hue},60%,75%)`);
+                    ng.addColorStop(0.6, `hsl(${def.hue},50%,55%)`);
+                    ng.addColorStop(1, `hsla(${def.hue},40%,35%,0)`);
+                    ctx.fillStyle = ng;
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, nR, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tendrils (wavy appendages)
+                    if (s >= 34) {
+                        ctx.strokeStyle = `hsla(${def.hue},45%,50%,0.35)`;
+                        ctx.lineWidth = 1.2;
+                        for (let td = 0; td < 3; td++) {
+                            const ta = (td / 3) * Math.PI * 2 + Math.PI + t * 0.8;
+                            ctx.beginPath();
+                            ctx.moveTo(cx + Math.cos(ta) * r * 0.8, cy + Math.sin(ta) * r * 0.8);
+                            const tipX = cx + Math.cos(ta) * r * 1.4 + Math.sin(t * Math.PI * 3 + td) * 3;
+                            const tipY = cy + Math.sin(ta) * r * 1.4 + Math.cos(t * Math.PI * 3 + td) * 3;
+                            ctx.quadraticCurveTo(
+                                cx + Math.cos(ta + 0.3) * r * 1.1,
+                                cy + Math.sin(ta + 0.3) * r * 1.1,
+                                tipX, tipY
+                            );
+                            ctx.stroke();
+                        }
+                    }
+
+                    // Tiny spore dots
+                    for (let sp = 0; sp < 3; sp++) {
+                        const sa = (sp / 3) * Math.PI * 2 + t * 2;
+                        const sd = r * 0.55;
+                        ctx.fillStyle = `hsla(${def.hue},50%,60%,0.4)`;
+                        ctx.beginPath();
+                        ctx.arc(cx + Math.cos(sa) * sd, cy + Math.sin(sa) * sd, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    // Mechanical: angular ship-like design with thrusters and details
+                    drawGlow(ctx, cx, cy, r + 4, def.hue, 0.15);
+
+                    // Main hull — pointed nose, angled body
+                    ctx.beginPath();
+                    ctx.moveTo(cx - r * 0.9, cy);                      // nose (left = front since enemies face left)
+                    ctx.lineTo(cx - r * 0.3, cy - r * 0.6);           // top-front
+                    ctx.lineTo(cx + r * 0.4, cy - r * 0.75);          // top wing tip
+                    ctx.lineTo(cx + r * 0.8, cy - r * 0.4);           // top rear
+                    ctx.lineTo(cx + r * 0.9, cy);                      // rear center
+                    ctx.lineTo(cx + r * 0.8, cy + r * 0.4);           // bottom rear
+                    ctx.lineTo(cx + r * 0.4, cy + r * 0.75);          // bottom wing tip
+                    ctx.lineTo(cx - r * 0.3, cy + r * 0.6);           // bottom-front
+                    ctx.closePath();
+                    // Dark metallic gradient
+                    const hg = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+                    hg.addColorStop(0, `hsl(${def.hue},25%,35%)`);
+                    hg.addColorStop(0.3, '#1e1e2e');
+                    hg.addColorStop(0.7, '#161622');
+                    hg.addColorStop(1, `hsl(${def.hue},20%,25%)`);
+                    ctx.fillStyle = hg;
+                    ctx.fill();
+                    ctx.strokeStyle = `hsla(${def.hue},30%,45%,0.4)`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Panel detail lines
+                    ctx.strokeStyle = 'rgba(80,100,130,0.25)';
                     ctx.lineWidth = 0.6;
                     ctx.beginPath();
                     ctx.moveTo(cx - r * 0.5, cy);
-                    ctx.lineTo(cx + r * 0.5, cy);
+                    ctx.lineTo(cx + r * 0.6, cy);
                     ctx.stroke();
                     ctx.beginPath();
-                    ctx.moveTo(cx, cy - r * 0.5);
-                    ctx.lineTo(cx, cy + r * 0.5);
+                    ctx.moveTo(cx, cy - r * 0.4);
+                    ctx.lineTo(cx + r * 0.3, cy + r * 0.4);
                     ctx.stroke();
-                    // Glowing sensor dot
-                    const dotR = s * 0.08;
-                    ctx.fillStyle = `hsl(${def.hue},60%,60%)`;
+
+                    // Engine thruster glow (rear)
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const thrustA = 0.3 + Math.sin(t * Math.PI * 4) * 0.15;
+                    ctx.fillStyle = `hsla(${def.hue},60%,60%,${thrustA})`;
                     ctx.shadowColor = `hsl(${def.hue},60%,60%)`;
-                    ctx.shadowBlur = 4;
+                    ctx.shadowBlur = 6;
                     ctx.beginPath();
-                    ctx.arc(cx + r * 0.2, cy - r * 0.1, dotR, 0, Math.PI * 2);
+                    ctx.ellipse(cx + r * 0.9, cy - r * 0.15, 3, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(cx + r * 0.9, cy + r * 0.15, 3, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Weapon barrel / sensor (nose area)
+                    ctx.fillStyle = `hsl(${def.hue},50%,55%)`;
+                    ctx.shadowColor = `hsl(${def.hue},50%,55%)`;
+                    ctx.shadowBlur = 3;
+                    ctx.beginPath();
+                    ctx.arc(cx - r * 0.65, cy, s * 0.06, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.shadowBlur = 0;
+
+                    // Wing accent stripes
+                    if (s >= 30) {
+                        ctx.fillStyle = `hsla(${def.hue},40%,50%,0.2)`;
+                        ctx.beginPath();
+                        ctx.moveTo(cx + r * 0.2, cy - r * 0.65);
+                        ctx.lineTo(cx + r * 0.5, cy - r * 0.7);
+                        ctx.lineTo(cx + r * 0.5, cy - r * 0.55);
+                        ctx.lineTo(cx + r * 0.2, cy - r * 0.5);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(cx + r * 0.2, cy + r * 0.65);
+                        ctx.lineTo(cx + r * 0.5, cy + r * 0.7);
+                        ctx.lineTo(cx + r * 0.5, cy + r * 0.55);
+                        ctx.lineTo(cx + r * 0.2, cy + r * 0.5);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+
+                    // Antenna (turret enemies)
+                    if (def.pattern === 'fixed') {
+                        ctx.strokeStyle = `hsla(${def.hue},40%,55%,0.5)`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy - r * 0.4);
+                        ctx.lineTo(cx - r * 0.3, cy - r * 0.9);
+                        ctx.stroke();
+                        ctx.fillStyle = `hsl(${def.hue},50%,60%)`;
+                        ctx.beginPath();
+                        ctx.arc(cx - r * 0.3, cy - r * 0.9, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             });
         }
     });
 
-    // ---- Boss sprites — rectangular Core warship design ----
+    // ---- Boss sprites — warship/creature designs ----
     BOSSES.forEach(boss => {
         for (let f = 0; f < 4; f++) {
             makeTex(scene, `boss_${boss.id}_${f}`, boss.w + 40, boss.h + 40, (ctx, w, h) => {
@@ -327,133 +444,214 @@ function generateAssets(scene) {
                 const pulse = 1 + Math.sin(t * Math.PI * 2) * 0.04;
                 const hw = boss.w * 0.48 * pulse;
                 const hh = boss.h * 0.48 * pulse;
-
-                // Dark rectangular hull
-                ctx.beginPath();
-                ctx.rect(cx - hw, cy - hh, hw * 2, hh * 2);
-                const hullG = ctx.createLinearGradient(cx - hw, cy - hh, cx - hw, cy + hh);
-                hullG.addColorStop(0, '#2a2a3a');
-                hullG.addColorStop(0.3, '#1e1e2e');
-                hullG.addColorStop(1, '#181825');
-                ctx.fillStyle = hullG;
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(60,80,100,0.5)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Panel separation lines
-                ctx.strokeStyle = 'rgba(60,80,100,0.4)';
-                ctx.lineWidth = 1;
-                // Horizontal lines
-                ctx.beginPath();
-                ctx.moveTo(cx - hw, cy - hh * 0.3);
-                ctx.lineTo(cx + hw, cy - hh * 0.3);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(cx - hw, cy + hh * 0.3);
-                ctx.lineTo(cx + hw, cy + hh * 0.3);
-                ctx.stroke();
-                // Vertical lines
-                ctx.beginPath();
-                ctx.moveTo(cx - hw * 0.4, cy - hh);
-                ctx.lineTo(cx - hw * 0.4, cy + hh);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(cx + hw * 0.4, cy - hh);
-                ctx.lineTo(cx + hw * 0.4, cy + hh);
-                ctx.stroke();
-
-                // Barrier plates (visual) — along edges
-                const barrierCount = boss.barriers || 4;
-                ctx.fillStyle = 'rgba(100,130,170,0.35)';
-                ctx.strokeStyle = 'rgba(120,150,190,0.5)';
-                ctx.lineWidth = 1;
-                const plateW = hw * 0.35;
-                const plateH = hh * 0.2;
-                // Top barrier
-                if (barrierCount >= 1) {
-                    ctx.fillRect(cx - plateW/2, cy - hh - plateH * 0.6, plateW, plateH);
-                    ctx.strokeRect(cx - plateW/2, cy - hh - plateH * 0.6, plateW, plateH);
-                }
-                // Bottom barrier
-                if (barrierCount >= 2) {
-                    ctx.fillRect(cx - plateW/2, cy + hh - plateH * 0.4, plateW, plateH);
-                    ctx.strokeRect(cx - plateW/2, cy + hh - plateH * 0.4, plateW, plateH);
-                }
-                // Front-top barrier
-                if (barrierCount >= 3) {
-                    ctx.fillRect(cx + hw - plateH * 0.4, cy - hh * 0.5 - plateH/2, plateH, plateW);
-                    ctx.strokeRect(cx + hw - plateH * 0.4, cy - hh * 0.5 - plateH/2, plateH, plateW);
-                }
-                // Front-bottom barrier
-                if (barrierCount >= 4) {
-                    ctx.fillRect(cx + hw - plateH * 0.4, cy + hh * 0.5 - plateH/2, plateH, plateW);
-                    ctx.strokeRect(cx + hw - plateH * 0.4, cy + hh * 0.5 - plateH/2, plateH, plateW);
-                }
-
-                // Central core sphere
-                const coreR = Math.min(hw, hh) * 0.35 * (1 + Math.sin(t * Math.PI * 2) * 0.1);
                 const coreColorR = (boss.coreColor >> 16) & 0xff;
                 const coreColorG = (boss.coreColor >> 8) & 0xff;
                 const coreColorB = boss.coreColor & 0xff;
-                const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-                cg.addColorStop(0, `rgba(255,255,255,0.9)`);
-                cg.addColorStop(0.3, `rgba(${coreColorR},${coreColorG},${coreColorB},0.9)`);
-                cg.addColorStop(0.7, `rgba(${coreColorR>>1},${coreColorG>>1},${coreColorB>>1},0.8)`);
-                cg.addColorStop(1, `rgba(${coreColorR>>2},${coreColorG>>2},${coreColorB>>2},0.4)`);
-                ctx.fillStyle = cg;
+
+                // Main hull — angular warship shape (pointed nose on left)
                 ctx.beginPath();
-                ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+                ctx.moveTo(cx - hw * 1.1, cy);                        // nose
+                ctx.lineTo(cx - hw * 0.5, cy - hh * 0.5);            // upper-front
+                ctx.lineTo(cx - hw * 0.1, cy - hh * 0.85);           // upper wing root
+                ctx.lineTo(cx + hw * 0.5, cy - hh * 0.95);           // upper wing tip
+                ctx.lineTo(cx + hw * 0.8, cy - hh * 0.6);            // upper rear
+                ctx.lineTo(cx + hw * 1.0, cy - hh * 0.3);            // top-rear corner
+                ctx.lineTo(cx + hw * 1.0, cy + hh * 0.3);            // bottom-rear corner
+                ctx.lineTo(cx + hw * 0.8, cy + hh * 0.6);            // lower rear
+                ctx.lineTo(cx + hw * 0.5, cy + hh * 0.95);           // lower wing tip
+                ctx.lineTo(cx - hw * 0.1, cy + hh * 0.85);           // lower wing root
+                ctx.lineTo(cx - hw * 0.5, cy + hh * 0.5);            // lower-front
+                ctx.closePath();
+                const hullG = ctx.createLinearGradient(cx, cy - hh, cx, cy + hh);
+                hullG.addColorStop(0, '#303048');
+                hullG.addColorStop(0.3, '#1e1e30');
+                hullG.addColorStop(0.7, '#181828');
+                hullG.addColorStop(1, '#252540');
+                ctx.fillStyle = hullG;
                 ctx.fill();
-                // Core glow
+                ctx.strokeStyle = 'rgba(80,100,140,0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Armor plating sections
+                ctx.strokeStyle = 'rgba(60,80,110,0.35)';
+                ctx.lineWidth = 0.8;
+                // Horizontal panel lines
+                ctx.beginPath();
+                ctx.moveTo(cx - hw * 0.4, cy - hh * 0.25);
+                ctx.lineTo(cx + hw * 0.9, cy - hh * 0.25);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx - hw * 0.4, cy + hh * 0.25);
+                ctx.lineTo(cx + hw * 0.9, cy + hh * 0.25);
+                ctx.stroke();
+                // Vertical sections
+                ctx.beginPath();
+                ctx.moveTo(cx + hw * 0.2, cy - hh * 0.8);
+                ctx.lineTo(cx + hw * 0.2, cy + hh * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx + hw * 0.6, cy - hh * 0.5);
+                ctx.lineTo(cx + hw * 0.6, cy + hh * 0.5);
+                ctx.stroke();
+
+                // Weapon turrets (small boxes along front)
+                ctx.fillStyle = 'rgba(90,110,140,0.5)';
+                const turretSize = hh * 0.12;
+                [-0.35, 0, 0.35].forEach(yf => {
+                    ctx.fillRect(cx - hw * 0.7, cy + hh * yf - turretSize/2, turretSize * 1.5, turretSize);
+                    // Barrel
+                    ctx.fillStyle = 'rgba(120,140,170,0.6)';
+                    ctx.fillRect(cx - hw * 0.85, cy + hh * yf - 1, turretSize, 2);
+                    ctx.fillStyle = 'rgba(90,110,140,0.5)';
+                });
+
+                // Engine vents (rear)
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
-                ctx.shadowColor = `rgba(${coreColorR},${coreColorG},${coreColorB},0.6)`;
-                ctx.shadowBlur = 12;
-                ctx.fillStyle = `rgba(${coreColorR},${coreColorG},${coreColorB},0.15)`;
+                const ventA = 0.25 + Math.sin(t * Math.PI * 4) * 0.15;
+                ctx.fillStyle = `rgba(${coreColorR},${coreColorG},${coreColorB},${ventA})`;
+                ctx.shadowColor = `rgba(${coreColorR},${coreColorG},${coreColorB},0.5)`;
+                ctx.shadowBlur = 8;
+                [-0.25, 0, 0.25].forEach(yf => {
+                    ctx.beginPath();
+                    ctx.ellipse(cx + hw * 1.0, cy + hh * yf, 4, 6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.restore();
+
+                // Barrier plates on wing edges
+                const barrierCount = boss.barriers || 4;
+                ctx.fillStyle = 'rgba(80,120,170,0.3)';
+                ctx.strokeStyle = 'rgba(100,140,200,0.45)';
+                ctx.lineWidth = 1;
+                if (barrierCount >= 1) {
+                    ctx.fillRect(cx + hw * 0.3, cy - hh * 0.9, hw * 0.25, hh * 0.12);
+                    ctx.strokeRect(cx + hw * 0.3, cy - hh * 0.9, hw * 0.25, hh * 0.12);
+                }
+                if (barrierCount >= 2) {
+                    ctx.fillRect(cx + hw * 0.3, cy + hh * 0.78, hw * 0.25, hh * 0.12);
+                    ctx.strokeRect(cx + hw * 0.3, cy + hh * 0.78, hw * 0.25, hh * 0.12);
+                }
+                if (barrierCount >= 3) {
+                    ctx.fillRect(cx - hw * 0.2, cy - hh * 0.7, hh * 0.1, hw * 0.2);
+                    ctx.strokeRect(cx - hw * 0.2, cy - hh * 0.7, hh * 0.1, hw * 0.2);
+                }
+                if (barrierCount >= 4) {
+                    ctx.fillRect(cx - hw * 0.2, cy + hh * 0.5, hh * 0.1, hw * 0.2);
+                    ctx.strokeRect(cx - hw * 0.2, cy + hh * 0.5, hh * 0.1, hw * 0.2);
+                }
+
+                // Central power core
+                const coreR = Math.min(hw, hh) * 0.3 * (1 + Math.sin(t * Math.PI * 2) * 0.12);
+                const cg = ctx.createRadialGradient(cx + hw * 0.1, cy, 0, cx + hw * 0.1, cy, coreR);
+                cg.addColorStop(0, `rgba(255,255,255,0.95)`);
+                cg.addColorStop(0.25, `rgba(${coreColorR},${coreColorG},${coreColorB},0.9)`);
+                cg.addColorStop(0.6, `rgba(${coreColorR>>1},${coreColorG>>1},${coreColorB>>1},0.7)`);
+                cg.addColorStop(1, `rgba(${coreColorR>>2},${coreColorG>>2},${coreColorB>>2},0.2)`);
+                ctx.fillStyle = cg;
                 ctx.beginPath();
-                ctx.arc(cx, cy, coreR * 1.5, 0, Math.PI * 2);
+                ctx.arc(cx + hw * 0.1, cy, coreR, 0, Math.PI * 2);
                 ctx.fill();
+                // Core glow ring
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(${coreColorR},${coreColorG},${coreColorB},${0.3 + Math.sin(t * Math.PI * 2) * 0.15})`;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = `rgba(${coreColorR},${coreColorG},${coreColorB},0.5)`;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(cx + hw * 0.1, cy, coreR * 1.3, 0, Math.PI * 2);
+                ctx.stroke();
                 ctx.restore();
             });
         }
     });
 
-    // ---- Explosion frames ----
-    for (let f = 0; f < 8; f++) {
-        makeTex(scene, `explode_${f}`, 64, 64, (ctx, w, h) => {
+    // ---- Explosion frames (12 frames, richer effect) ----
+    for (let f = 0; f < 12; f++) {
+        makeTex(scene, `explode_${f}`, 80, 80, (ctx, w, h) => {
             const cx = w/2, cy = h/2;
-            const t = f / 8;
-            const r = 10 + t * 22;
-            const alpha = 1 - t * 0.8;
-            // Outer flash
+            const t = f / 12;
+            const r = 8 + t * 28;
+            const alpha = 1 - t * 0.85;
+
+            // Shockwave ring (appears in frames 2-6)
+            if (f >= 2 && f <= 8) {
+                const ringR = r * 1.3 + (f - 2) * 4;
+                const ringA = Math.max(0, 0.3 - (f - 2) * 0.04);
+                ctx.strokeStyle = `rgba(255,200,100,${ringA})`;
+                ctx.lineWidth = 2.5 - f * 0.15;
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Outer glow flash
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.fillStyle = `hsla(${40 - t * 30},60%,${55 - t * 20}%,${alpha * 0.15})`;
-            ctx.shadowColor = `hsla(${40 - t * 30},60%,50%,${alpha * 0.5})`;
-            ctx.shadowBlur = 10;
+            const glowR = r + 12;
+            ctx.fillStyle = `hsla(${45 - t * 40},70%,${60 - t * 25}%,${alpha * 0.12})`;
+            ctx.shadowColor = `hsla(${45 - t * 40},70%,55%,${alpha * 0.6})`;
+            ctx.shadowBlur = 14;
             ctx.beginPath();
-            ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
+            ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
-            // Core
+
+            // Hot core
             const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-            cg.addColorStop(0, `rgba(255,255,200,${alpha})`);
-            cg.addColorStop(0.3, `rgba(255,180,50,${alpha * 0.8})`);
-            cg.addColorStop(0.7, `rgba(255,80,20,${alpha * 0.5})`);
-            cg.addColorStop(1, `rgba(100,20,0,0)`);
+            cg.addColorStop(0, `rgba(255,255,220,${alpha})`);
+            cg.addColorStop(0.2, `rgba(255,220,80,${alpha * 0.9})`);
+            cg.addColorStop(0.5, `rgba(255,120,30,${alpha * 0.7})`);
+            cg.addColorStop(0.8, `rgba(200,40,10,${alpha * 0.3})`);
+            cg.addColorStop(1, `rgba(80,10,0,0)`);
             ctx.fillStyle = cg;
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
             ctx.fill();
-            // Sparks
-            for (let i = 0; i < 6; i++) {
-                const a = (i / 6) * Math.PI * 2 + t * 2;
-                const sr = r * (0.8 + Math.random() * 0.6);
-                ctx.fillStyle = `rgba(255,${200 + Math.random() * 55},100,${alpha * 0.7})`;
+
+            // Bright white center flash (early frames)
+            if (f < 4) {
+                const flashA = (1 - f / 4) * 0.8;
+                ctx.fillStyle = `rgba(255,255,255,${flashA})`;
                 ctx.beginPath();
-                ctx.arc(cx + Math.cos(a) * sr, cy + Math.sin(a) * sr, 2 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.arc(cx, cy, r * 0.3, 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            // Debris chunks (angular shapes flying outward)
+            const seed = f * 7;
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2 + seed * 0.3;
+                const dist = r * (0.6 + (((seed + i * 13) % 10) / 10) * 0.8);
+                const chunkSize = 1.5 + (((seed + i * 7) % 5) / 5) * 2.5;
+                const chunkA = alpha * 0.8;
+                const hueShift = ((seed + i * 3) % 30);
+                ctx.fillStyle = `rgba(255,${170 + hueShift},${60 + hueShift},${chunkA})`;
+                ctx.beginPath();
+                const dx = cx + Math.cos(a) * dist;
+                const dy = cy + Math.sin(a) * dist;
+                // Small angular chunk
+                ctx.moveTo(dx - chunkSize, dy);
+                ctx.lineTo(dx, dy - chunkSize * 0.7);
+                ctx.lineTo(dx + chunkSize, dy);
+                ctx.lineTo(dx, dy + chunkSize * 0.7);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Smoke wisps (later frames)
+            if (f > 4) {
+                const smokeA = (f - 4) / 8 * 0.15;
+                for (let i = 0; i < 4; i++) {
+                    const a = (i / 4) * Math.PI * 2 + f * 0.5;
+                    const sd = r * 0.5 + f * 2;
+                    ctx.fillStyle = `rgba(80,60,40,${smokeA})`;
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(a) * sd, cy + Math.sin(a) * sd, 4 + f * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         });
     }
@@ -523,10 +721,13 @@ class SFX {
         o.stop(t + dur + 0.01);
     }
     shoot() {
-        this._osc('sawtooth', 1200, 0.07, 0.15, 400);
+        // Vary pitch +/- 8% each shot to reduce fatigue
+        const pitch = 1000 + Math.random() * 200;
+        this._osc('sawtooth', pitch, 0.06, 0.10, 300 + Math.random() * 100);
     }
     laser() {
-        this._osc('sawtooth', 1800, 0.12, 0.2, 200);
+        const pitch = 1600 + Math.random() * 200;
+        this._osc('sawtooth', pitch, 0.10, 0.15, 180 + Math.random() * 40);
     }
     explosion() {
         if (!this.ready) return;

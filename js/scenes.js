@@ -174,6 +174,9 @@ class GameScene extends Phaser.Scene {
         this.stageClear = false;
         this.shakeMag = 0;
         this.gameTime = 0;
+        this.comboCount = 0;
+        this.comboTimer = 0;
+        this.comboMultiplier = 1;
 
         // Try bloom pipeline
         try {
@@ -587,41 +590,47 @@ class GameScene extends Phaser.Scene {
         const stageLabel = this.loopCount > 0
             ? `STAGE ${this.stageIdx + 1}  LOOP ${this.loopCount + 1}`
             : `STAGE ${this.stageIdx + 1}`;
+        // Combo display
+        this.comboText = this.add.text(CFG.W / 2, 34, '', {
+            fontSize: '14px', fontFamily: 'Impact, Arial Black, sans-serif',
+            fill: '#ffdd44', stroke: '#000000', strokeThickness: 2,
+        }).setOrigin(0.5, 0).setDepth(hd).setScrollFactor(0);
+
         this.add.text(14, 2, stageLabel, {
             fontSize: '8px', fontFamily: 'sans-serif', fill: '#6677aa', letterSpacing: 2,
         }).setOrigin(0, 0).setDepth(hd).setScrollFactor(0);
 
-        // ---- Power bar ----
+        // ---- Power bar (compact) ----
         const barW = 540;
-        const barH = 36;
+        const barH = 26;
         const barX = (CFG.W - barW) / 2;
-        const barY = CFG.H - barH - 4;
+        const barY = CFG.H - barH - 3;
         const slotW = barW / CFG.POWER_SLOTS.length;
         // Bar outer frame
         const barGfx = this.add.graphics().setDepth(hd).setScrollFactor(0);
-        barGfx.fillStyle(0x060610, 0.88);
-        barGfx.fillRoundedRect(barX - 3, barY - 3, barW + 6, barH + 6, 6);
-        barGfx.lineStyle(1, 0x222240, 0.6);
-        barGfx.strokeRoundedRect(barX - 3, barY - 3, barW + 6, barH + 6, 6);
-        // Slot labels and colors (cooler blue-grey tones)
+        barGfx.fillStyle(0x060610, 0.85);
+        barGfx.fillRoundedRect(barX - 2, barY - 2, barW + 4, barH + 4, 4);
+        barGfx.lineStyle(1, 0x222240, 0.5);
+        barGfx.strokeRoundedRect(barX - 2, barY - 2, barW + 4, barH + 4, 4);
+        // Slot labels and colors
         const slotColors = [0x1a6644, 0x885533, 0x2a5588, 0x2266aa, 0x886633, 0x554488];
         this.powerSlots = CFG.POWER_SLOTS.map((name, i) => {
             const sx = barX + i * slotW + slotW / 2;
             const sy = barY + barH / 2;
             // Slot background
-            const bg = this.add.rectangle(sx, sy, slotW - 3, barH - 4, 0x0c0c22, 0.95)
+            const bg = this.add.rectangle(sx, sy, slotW - 2, barH - 3, 0x0c0c22, 0.95)
                 .setDepth(hd + 1).setScrollFactor(0).setStrokeStyle(1, 0x222244);
-            // Glow rect (invisible until cursor)
-            const glow = this.add.rectangle(sx, sy, slotW - 1, barH - 2, 0x4488cc, 0)
+            // Glow rect
+            const glow = this.add.rectangle(sx, sy, slotW - 1, barH - 1, 0x4488cc, 0)
                 .setDepth(hd + 0.5).setScrollFactor(0);
             // Label
-            const label = this.add.text(sx, sy - 1, name, {
-                fontSize: '12px', fontFamily: 'Impact, Arial Black, sans-serif',
+            const label = this.add.text(sx, sy, name, {
+                fontSize: '11px', fontFamily: 'Impact, Arial Black, sans-serif',
                 fill: '#555577', stroke: '#000000', strokeThickness: 1,
                 letterSpacing: 0.5,
             }).setOrigin(0.5).setDepth(hd + 2).setScrollFactor(0);
             // Activated dot indicator
-            const dot = this.add.circle(sx + slotW / 2 - 8, barY + 6, 3, slotColors[i], 0)
+            const dot = this.add.circle(sx + slotW / 2 - 7, barY + 5, 2.5, slotColors[i], 0)
                 .setDepth(hd + 2).setScrollFactor(0);
             return { bg, glow, label, dot, baseColor: slotColors[i] };
         });
@@ -648,6 +657,14 @@ class GameScene extends Phaser.Scene {
             localStorage.setItem('parodius_hi', String(this.hiScore));
         }
         this.hiScoreText.setText(String(this.hiScore));
+
+        // Combo display
+        if (this.comboMultiplier > 1) {
+            this.comboText.setText(`${this.comboCount} HITS  x${this.comboMultiplier}`);
+            this.comboText.setAlpha(Math.min(this.comboTimer / 500, 1));
+        } else {
+            this.comboText.setText('');
+        }
 
         // Power bar — cursor highlight + activated indicators
         const pb = this.powerBar;
@@ -729,6 +746,15 @@ class GameScene extends Phaser.Scene {
 
         const dt = delta / 1000;
         this.gameTime += delta;
+
+        // Combo decay
+        if (this.comboTimer > 0) {
+            this.comboTimer -= delta;
+            if (this.comboTimer <= 0) {
+                this.comboCount = 0;
+                this.comboMultiplier = 1;
+            }
+        }
 
         // Scroll
         if (!this.bossActive) {
@@ -1175,16 +1201,51 @@ class GameScene extends Phaser.Scene {
         });
         if (enemy.hp <= 0) {
             this.killEnemy(enemy);
+        } else {
+            // Hit sparks on non-lethal damage
+            this.spawnHitSparks(bullet.x, bullet.y);
+        }
+    }
+
+    spawnHitSparks(x, y) {
+        for (let i = 0; i < 4; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 8 + Math.random() * 16;
+            const spark = this.add.circle(x, y, 1 + Math.random() * 1.5, 0xffdd88, 1).setDepth(20);
+            this.tweens.add({
+                targets: spark,
+                x: x + Math.cos(angle) * dist,
+                y: y + Math.sin(angle) * dist,
+                alpha: 0,
+                scale: 0.1,
+                duration: 100 + Math.random() * 100,
+                ease: 'Quad.Out',
+                onComplete: () => spark.destroy()
+            });
         }
     }
 
     killEnemy(enemy) {
-        this.score += enemy.score;
+        // Combo system
+        this.comboCount++;
+        this.comboTimer = 2000; // 2 second window
+        this.comboMultiplier = Math.min(1 + Math.floor(this.comboCount / 3), 8);
+        const baseScore = enemy.score;
+        const totalScore = baseScore * this.comboMultiplier;
+        this.score += totalScore;
+
         this.spawnExplosion(enemy.x, enemy.y);
-        this.spawnDeathParticles(enemy.x, enemy.y, 210);
+        this.spawnDeathParticles(enemy.x, enemy.y, enemy.def ? enemy.def.hue : 210);
         sfx.explosion();
         this.shakeMag = Math.max(this.shakeMag, 2);
-        this.floatText(enemy.x, enemy.y - 20, `+${enemy.score}`, '#88ccff', 12);
+
+        // Score text with combo info
+        if (this.comboMultiplier > 1) {
+            this.floatText(enemy.x, enemy.y - 20, `+${totalScore} x${this.comboMultiplier}`, '#ffdd44', 14);
+        } else {
+            this.floatText(enemy.x, enemy.y - 20, `+${totalScore}`, '#88ccff', 12);
+        }
+
         if (Math.random() < enemy.dropRate) {
             this.spawnCapsule(enemy.x, enemy.y);
         }
@@ -1632,12 +1693,12 @@ class GameScene extends Phaser.Scene {
 
     // ---- Effects ----
     spawnExplosion(x, y, big) {
-        const frames = 8;
+        const frames = 12;
         const spr = this.add.sprite(x, y, 'explode_0').setDepth(20);
-        if (big) spr.setScale(1.5);
+        if (big) spr.setScale(1.8);
         let frame = 0;
         const timer = this.time.addEvent({
-            delay: 50,
+            delay: 45,
             repeat: frames - 1,
             callback: () => {
                 frame++;
