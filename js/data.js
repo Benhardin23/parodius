@@ -1,6 +1,9 @@
 // ============================================================
-// GRADIUS IV — Game Data & Configuration
+// PARODIUS — Game Data & Configuration
 // ============================================================
+
+const GAME_TITLE = 'PARODIUS';
+const GAME_VERSION = 'v1.0.0';
 
 const CFG = {
     W: 960,

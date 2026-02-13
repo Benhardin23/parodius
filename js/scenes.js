@@ -1,5 +1,5 @@
 // ============================================================
-// GRADIUS IV SCENES — Boot, Title, Select, Game, GameOver
+// PARODIUS SCENES — Boot, Title, Select, Game, GameOver
 // ============================================================
 
 // ---- BOOT SCENE ----
@@ -32,15 +32,15 @@ class TitleScene extends Phaser.Scene {
             this.stars.push(s);
         }
         // Title
-        this.add.text(CFG.W / 2, 140, 'GRADIUS IV', {
+        this.add.text(CFG.W / 2, 140, GAME_TITLE, {
             fontSize: '72px', fontFamily: 'Impact, sans-serif',
             fill: '#8899cc', stroke: '#334466', strokeThickness: 6,
         }).setOrigin(0.5);
-        this.add.text(CFG.W / 2, 210, '\u30B0\u30E9\u30C7\u30A3\u30A6\u30B9IV', {
+        this.add.text(CFG.W / 2, 210, '\u30D1\u30ED\u30C7\u30A3\u30A6\u30B9', {
             fontSize: '24px', fontFamily: 'sans-serif', fill: '#6688aa'
         }).setOrigin(0.5);
-        this.add.text(CFG.W / 2, 280, '\u2014 FUKKATSU \u2014', {
-            fontSize: '16px', fontFamily: 'monospace', fill: '#556688'
+        this.add.text(CFG.W / 2, 270, GAME_VERSION, {
+            fontSize: '14px', fontFamily: 'monospace', fill: '#556688'
         }).setOrigin(0.5);
         // Start prompt
         this.startText = this.add.text(CFG.W / 2, 390, 'PRESS ENTER OR SPACE', {
@@ -144,7 +144,7 @@ class GameScene extends Phaser.Scene {
         this.stageIdx = data.stageIndex || 0;
         this.score = data.score || 0;
         this.lives = data.lives !== undefined ? data.lives : CFG.START_LIVES;
-        this.hiScore = parseInt(localStorage.getItem('gradius4_hi') || '0');
+        this.hiScore = parseInt(localStorage.getItem('parodius_hi') || '0');
     }
 
     create() {
@@ -248,10 +248,24 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(100).setScrollFactor(0);
         this.tweens.add({ targets: [stName, stSub], alpha: 0, delay: 2000, duration: 1000, onComplete: () => { stName.destroy(); stSub.destroy(); }});
 
+        // ---- Pause overlay ----
+        this.pauseOverlay = this.add.rectangle(CFG.W / 2, CFG.H / 2, CFG.W, CFG.H, 0x000000, 0.55)
+            .setScrollFactor(0).setDepth(999).setVisible(false);
+        this.pauseText = this.add.text(CFG.W / 2, CFG.H / 2 - 30, 'PAUSED', {
+            fontSize: '48px', fontFamily: 'Impact, sans-serif',
+            fill: '#ffffff', stroke: '#000000', strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000).setVisible(false);
+        this.pauseHintText = this.add.text(CFG.W / 2, CFG.H / 2 + 20, 'Press ESC or P to Resume', {
+            fontSize: '16px', fontFamily: 'monospace',
+            fill: '#8899cc', stroke: '#000000', strokeThickness: 2
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000).setVisible(false);
+
         // Start music
-        const bpms = [140, 155, 130];
-        const notes = [220, 246, 196];
-        sfx.startMusic(bpms[this.stageIdx % bpms.length], notes[this.stageIdx % notes.length]);
+        const bpms = [140, 155, 130, 135, 160, 120, 150];
+        const notes = [220, 246, 196, 233, 261, 185, 247];
+        const styles = ['default', 'tense', 'chill', 'dark', 'industrial', 'ethereal', 'military'];
+        const si = this.stageIdx % bpms.length;
+        sfx.startMusic(bpms[si], notes[si], styles[si]);
     }
 
     createBackground() {
@@ -375,7 +389,7 @@ class GameScene extends Phaser.Scene {
         this.livesText.setText(hearts > 0 ? '\u2764'.repeat(hearts) : '');
         if (this.score > this.hiScore) {
             this.hiScore = this.score;
-            localStorage.setItem('gradius4_hi', String(this.hiScore));
+            localStorage.setItem('parodius_hi', String(this.hiScore));
         }
         this.hiScoreText.setText(String(this.hiScore));
 
@@ -449,15 +463,16 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        if (this.paused || this.stageClear) return;
-        const dt = delta / 1000;
-        this.gameTime += delta;
-
-        // Pause toggle
+        // Pause toggle must run before paused early return
         if (Phaser.Input.Keyboard.JustDown(this.keyEsc) || Phaser.Input.Keyboard.JustDown(this.keyP)) {
-            this.paused = !this.paused;
+            this.togglePause();
             return;
         }
+
+        if (this.paused || this.stageClear) return;
+
+        const dt = delta / 1000;
+        this.gameTime += delta;
 
         // Scroll
         if (!this.bossActive) {
@@ -585,6 +600,22 @@ class GameScene extends Phaser.Scene {
 
         // ---- HUD ----
         this.updateHUD();
+    }
+
+    togglePause() {
+        this.paused = !this.paused;
+        this.pauseOverlay.setVisible(this.paused);
+        this.pauseText.setVisible(this.paused);
+        this.pauseHintText.setVisible(this.paused);
+        if (this.paused) {
+            sfx.stopMusic();
+        } else {
+            const bpms = [140, 155, 130, 135, 160, 120, 150];
+            const notes = [220, 246, 196, 233, 261, 185, 247];
+            const styles = ['default', 'tense', 'chill', 'dark', 'industrial', 'ethereal', 'military'];
+            const si = this.stageIdx % bpms.length;
+            sfx.startMusic(bpms[si], notes[si], styles[si]);
+        }
     }
 
     // ---- Weapon firing ----

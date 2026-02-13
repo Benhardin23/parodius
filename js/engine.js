@@ -1,5 +1,5 @@
 // ============================================================
-// GRADIUS IV ENGINE — Assets, Audio, Entities, Systems
+// PARODIUS ENGINE — Assets, Audio, Entities, Systems
 // ============================================================
 
 // ---- Utility: procedural texture helper ----
@@ -604,44 +604,166 @@ class SFX {
             setTimeout(() => this._osc('triangle', hz, 0.2, 0.2), i * 120);
         });
     }
-    // Simple procedural background music
-    startMusic(bpm = 140, baseNote = 220) {
-        if (!this.ready) return;
+    // ---- Procedural background music with Web Audio scheduling ----
+    startMusic(bpm = 140, baseNote = 220, style = 'default') {
+        if (!this.ready || !this.ctx || !this.master) return;
         this.stopMusic();
+
         const beatLen = 60 / bpm;
-        const bass = [1, 1, 1.25, 1.5, 1, 1, 1.25, 1.33];
-        const mel  = [2, 2.5, 3, 2.5, 2, 1.5, 2, 2.5];
-        let step = 0;
-        this._musicInterval = setInterval(() => {
-            const t = this.ctx.currentTime;
-            const bi = step % bass.length;
-            const mi = step % mel.length;
-            // Bass
-            const ob = this.ctx.createOscillator();
-            const gb = this.ctx.createGain();
-            ob.type = 'triangle';
-            ob.frequency.value = baseNote * bass[bi];
-            gb.gain.setValueAtTime(0.06, t);
-            gb.gain.exponentialRampToValueAtTime(0.0001, t + beatLen * 0.8);
-            ob.connect(gb).connect(this.master);
-            ob.start(t); ob.stop(t + beatLen);
-            // Melody
-            const om = this.ctx.createOscillator();
-            const gm = this.ctx.createGain();
-            om.type = 'square';
-            om.frequency.value = baseNote * mel[mi];
-            gm.gain.setValueAtTime(0.03, t);
-            gm.gain.exponentialRampToValueAtTime(0.0001, t + beatLen * 0.6);
-            om.connect(gm).connect(this.master);
-            om.start(t); om.stop(t + beatLen);
-            step++;
-        }, beatLen * 1000);
+        const sixteenth = beatLen / 4;
+        const scheduleAhead = 0.12;
+        const schedulerTickMs = 25;
+        const startAt = this.ctx.currentTime + 0.02;
+
+        // Style bank — different moods per stage
+        const styles = {
+            default: {
+                bass: [1, 1, 1.25, 1.5, 1, 1, 1.25, 1.33],
+                mel: [2, 2.5, 3, 2.5, 2, 1.5, 2, 2.5],
+                bassType: 'triangle', melType: 'square',
+                bassGain: 0.055, melGain: 0.03,
+                hatEvery: 1, hatGain: 0.016, kickGain: 0.22
+            },
+            chill: {
+                bass: [1, 1, 1.125, 1.25, 1, 1, 1.125, 1.2],
+                mel: [1.5, 2, 2.25, 2, 1.5, 1.33, 1.5, 2],
+                bassType: 'sine', melType: 'triangle',
+                bassGain: 0.05, melGain: 0.022,
+                hatEvery: 2, hatGain: 0.01, kickGain: 0.18
+            },
+            tense: {
+                bass: [1, 0.94, 1.125, 1.33, 1, 0.94, 1.125, 1.5],
+                mel: [2, 2.25, 2.66, 2.25, 2, 1.78, 2, 2.25],
+                bassType: 'sawtooth', melType: 'square',
+                bassGain: 0.05, melGain: 0.028,
+                hatEvery: 1, hatGain: 0.02, kickGain: 0.24
+            },
+            dark: {
+                bass: [1, 0.89, 1.06, 1.19, 1, 0.89, 1.06, 1.33],
+                mel: [2, 2.37, 2.83, 2.37, 2, 1.78, 2, 2.37],
+                bassType: 'sawtooth', melType: 'sawtooth',
+                bassGain: 0.045, melGain: 0.025,
+                hatEvery: 1, hatGain: 0.018, kickGain: 0.2
+            },
+            industrial: {
+                bass: [1, 1, 1.33, 1.5, 1, 1.06, 1.33, 1.78],
+                mel: [2, 2.66, 3, 2.66, 2, 1.5, 2, 2.66],
+                bassType: 'square', melType: 'sawtooth',
+                bassGain: 0.04, melGain: 0.03,
+                hatEvery: 1, hatGain: 0.022, kickGain: 0.26
+            },
+            ethereal: {
+                bass: [1, 1.06, 1.19, 1.25, 1, 1.06, 1.19, 1.33],
+                mel: [3, 3.56, 4, 3.56, 3, 2.67, 3, 3.56],
+                bassType: 'sine', melType: 'sine',
+                bassGain: 0.05, melGain: 0.02,
+                hatEvery: 2, hatGain: 0.01, kickGain: 0.15
+            },
+            military: {
+                bass: [1, 1, 1.25, 1.5, 1.25, 1, 1.5, 1.33],
+                mel: [2, 2.5, 3, 3.5, 3, 2.5, 2, 2.5],
+                bassType: 'triangle', melType: 'square',
+                bassGain: 0.05, melGain: 0.032,
+                hatEvery: 1, hatGain: 0.02, kickGain: 0.25
+            }
+        };
+        const cfg = styles[style] || styles.default;
+
+        // Noise buffer for percussion
+        const noiseLen = Math.floor(this.ctx.sampleRate * 0.25);
+        const noiseBuf = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+        const noiseData = noiseBuf.getChannelData(0);
+        for (let i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1;
+        this._musicNoiseBuffer = noiseBuf;
+
+        const schedBass = (t, freq) => {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = cfg.bassType;
+            o.frequency.setValueAtTime(freq, t);
+            g.gain.setValueAtTime(cfg.bassGain, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + beatLen * 0.8);
+            o.connect(g).connect(this.master);
+            o.start(t); o.stop(t + beatLen);
+        };
+        const schedMel = (t, freq) => {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = cfg.melType;
+            o.frequency.setValueAtTime(freq, t);
+            g.gain.setValueAtTime(cfg.melGain, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + beatLen * 0.55);
+            o.connect(g).connect(this.master);
+            o.start(t); o.stop(t + beatLen * 0.7);
+        };
+        const schedKick = (t) => {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(140, t);
+            o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+            g.gain.setValueAtTime(cfg.kickGain, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+            o.connect(g).connect(this.master);
+            o.start(t); o.stop(t + 0.15);
+        };
+        const schedHat = (t, open) => {
+            const src = this.ctx.createBufferSource();
+            src.buffer = noiseBuf;
+            const hp = this.ctx.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.setValueAtTime(open ? 5000 : 7000, t);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(cfg.hatGain, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + (open ? 0.09 : 0.03));
+            src.connect(hp).connect(g).connect(this.master);
+            src.start(t); src.stop(t + (open ? 0.1 : 0.04));
+        };
+
+        // Transport state
+        this._musicState = {
+            beatLen, sixteenth, step16: 0,
+            nextNoteTime: startAt, running: true
+        };
+
+        const scheduler = () => {
+            const s = this._musicState;
+            if (!s || !s.running) return;
+            while (s.nextNoteTime < this.ctx.currentTime + scheduleAhead) {
+                const step16 = s.step16;
+                const beatStep = Math.floor(step16 / 4) % 8;
+                // Kick on quarter notes
+                if (step16 % 4 === 0) schedKick(s.nextNoteTime);
+                if (style === 'tense' && step16 % 8 === 6) schedKick(s.nextNoteTime);
+                // Hi-hat
+                if (step16 % cfg.hatEvery === 0) {
+                    schedHat(s.nextNoteTime, step16 % 16 === 12);
+                }
+                // Bass + melody on quarter notes
+                if (step16 % 4 === 0) {
+                    schedBass(s.nextNoteTime, baseNote * cfg.bass[beatStep]);
+                    const melRatio = cfg.mel[beatStep] * ((step16 % 32 === 28) ? 0.5 : 1);
+                    schedMel(s.nextNoteTime, baseNote * melRatio);
+                }
+                s.nextNoteTime += s.sixteenth;
+                s.step16++;
+            }
+        };
+
+        this._musicInterval = setInterval(scheduler, schedulerTickMs);
+        const rafLoop = () => {
+            const s = this._musicState;
+            if (!s || !s.running) return;
+            scheduler();
+            this._musicRaf = requestAnimationFrame(rafLoop);
+        };
+        this._musicRaf = requestAnimationFrame(rafLoop);
     }
     stopMusic() {
-        if (this._musicInterval) {
-            clearInterval(this._musicInterval);
-            this._musicInterval = null;
-        }
+        if (this._musicInterval) { clearInterval(this._musicInterval); this._musicInterval = null; }
+        if (this._musicRaf) { cancelAnimationFrame(this._musicRaf); this._musicRaf = null; }
+        if (this._musicState) { this._musicState.running = false; this._musicState = null; }
+        this._musicNoiseBuffer = null;
     }
 }
 
