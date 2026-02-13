@@ -267,6 +267,12 @@ class GameScene extends Phaser.Scene {
         const styles = ['default', 'tense', 'chill', 'dark', 'industrial', 'ethereal', 'military'];
         const si = this.stageIdx % bpms.length;
         sfx.startMusic(bpms[si], notes[si], styles[si]);
+
+        // Cleanup on scene shutdown to prevent leaks
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            sfx.stopMusic();
+            this.engineParticles.stop();
+        });
     }
 
     createBackground() {
@@ -992,6 +998,7 @@ class GameScene extends Phaser.Scene {
     }
 
     playerDie() {
+        if (this.playerDead || this.stageClear || this.bossDefeated) return;
         this.playerDead = true;
         this.player.setVisible(false);
         this.player.body.stop();
@@ -1084,10 +1091,11 @@ class GameScene extends Phaser.Scene {
         }
 
         const hpRatio = this.bossHP / this.bossMaxHP;
+        // Pick lowest-threshold phase that hpRatio qualifies for
         let phase = bd.phases[0];
-        for (let i = bd.phases.length - 1; i >= 0; i--) {
-            if (hpRatio <= bd.phases[i].at) {
-                phase = bd.phases[i];
+        for (const p of bd.phases) {
+            if (hpRatio <= p.at && p.at <= phase.at) {
+                phase = p;
             }
         }
 
@@ -1210,7 +1218,7 @@ class GameScene extends Phaser.Scene {
     }
 
     killBoss() {
-        if (this.bossDefeated) return;
+        if (this.bossDefeated || this.stageClear) return;
         this.bossDefeated = true;
         this.score += 10000;
         this.invulnTimer = 99999;
@@ -1269,7 +1277,7 @@ class GameScene extends Phaser.Scene {
             this.time.delayedCall(CFG.STAGE_CLEAR_TIME, () => {
                 sfx.stopMusic();
                 if (!hasMoreStages) {
-                    this.floatText(CFG.W / 2, CFG.H / 2 - 60, `ENTERING LOOP ${this.loopCount + 2}`, '#ffcc44', 28);
+                    this.floatText(CFG.W / 2, CFG.H / 2 - 60, `ENTERING LOOP ${transitionData.loopCount + 1}`, '#ffcc44', 28);
                 }
                 this.time.delayedCall(hasMoreStages ? 0 : 1500, () => {
                     this.scene.restart(transitionData);
