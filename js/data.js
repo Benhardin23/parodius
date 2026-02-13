@@ -9,7 +9,7 @@ const CFG = {
     W: 960,
     H: 540,
     SCROLL_SPEED: 3.5,
-    PLAYER_SPEED: 280,
+    PLAYER_SPEED: 350,
     BULLET_SPEED: 650,
     ENEMY_BULLET_SPEED: 220,
     MAX_OPTIONS: 4,

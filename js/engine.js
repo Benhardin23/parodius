@@ -871,7 +871,7 @@ class PowerBar {
         this.shieldHP = 0;
     }
     getSpeed() {
-        return CFG.PLAYER_SPEED + this.speedLevel * 40;
+        return CFG.PLAYER_SPEED + this.speedLevel * 50;
     }
 }
 

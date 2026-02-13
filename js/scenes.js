@@ -184,6 +184,10 @@ class GameScene extends Phaser.Scene {
         this.bgLayers = [];
         this.createBackground();
 
+        // ---- Terrain ----
+        this.terrainGfx = this.add.graphics().setDepth(2).setScrollFactor(0);
+        this.terrainScroll = 0;
+
         // ---- Physics Groups ----
         this.playerBullets = this.physics.add.group({ maxSize: 80 });
         this.enemyBullets = this.physics.add.group({ maxSize: 120 });
@@ -276,10 +280,114 @@ class GameScene extends Phaser.Scene {
     }
 
     createBackground() {
-        const h = this.stageData.bgHue;
-        // Layer 0 - deep bg (slowest) — slightly blue-shifted
+        const hue = this.stageData.bgHue;
+        const stageNum = this.stageIdx + 1;
+
+        // Static background graphics (drawn once, don't scroll)
+        const bgStatic = this.add.graphics().setDepth(-15).setScrollFactor(0);
+
+        // Gradient sky fill
+        for (let y = 0; y < CFG.H; y++) {
+            const t = y / CFG.H;
+            const r = Math.floor(8 + t * 6);
+            const g = Math.floor(8 + t * 6);
+            const b = Math.floor(16 + t * 10);
+            bgStatic.fillStyle(Phaser.Display.Color.GetColor(r, g, b), 1);
+            bgStatic.fillRect(0, y, CFG.W, 1);
+        }
+
+        // Stage-specific atmosphere layers
+        if (stageNum === 2) {
+            // Magma: warm bottom glow
+            for (let y = 0; y < 160; y++) {
+                const a = (y / 160) * 0.12;
+                bgStatic.fillStyle(0xff4400, a);
+                bgStatic.fillRect(0, CFG.H - y, CFG.W, 1);
+            }
+        } else if (stageNum === 3) {
+            // Cell: organic ambient blobs
+            for (let i = 0; i < 20; i++) {
+                const cx = Math.random() * CFG.W;
+                const cy = Math.random() * CFG.H;
+                const rx = 50 + Math.random() * 120;
+                const ry = 30 + Math.random() * 80;
+                bgStatic.fillStyle(Phaser.Display.Color.HSLToColor(hue / 360, 0.25, 0.12).color, 0.3);
+                bgStatic.fillEllipse(cx, cy, rx, ry);
+            }
+            // Membrane outlines
+            bgStatic.lineStyle(1.5, Phaser.Display.Color.HSLToColor(hue / 360, 0.3, 0.25).color, 0.2);
+            for (let i = 0; i < 12; i++) {
+                bgStatic.strokeEllipse(
+                    Math.random() * CFG.W, Math.random() * CFG.H,
+                    80 + Math.random() * 180, 20 + Math.random() * 60
+                );
+            }
+        } else if (stageNum === 4) {
+            // Crystal: ice shard silhouettes
+            for (let i = 0; i < 30; i++) {
+                const cx = Math.random() * CFG.W;
+                const cy = Math.random() * CFG.H;
+                const s = 10 + Math.random() * 30;
+                bgStatic.fillStyle(0x88ddff, 0.06 + Math.random() * 0.06);
+                bgStatic.fillTriangle(cx, cy - s, cx - s * 0.5, cy + s, cx + s * 0.5, cy + s);
+            }
+        } else if (stageNum === 5) {
+            // Factory: grid panels
+            bgStatic.lineStyle(1, 0x222844, 0.4);
+            for (let x = 0; x < CFG.W; x += 80) bgStatic.lineBetween(x, 0, x, CFG.H);
+            for (let y = 0; y < CFG.H; y += 60) bgStatic.lineBetween(0, y, CFG.W, y);
+            // Pipe silhouettes
+            bgStatic.fillStyle(0x181c28, 0.7);
+            for (let i = 0; i < 6; i++) {
+                const py = Math.random() * CFG.H;
+                bgStatic.fillRect(0, py, CFG.W, 8 + Math.random() * 14);
+            }
+        } else if (stageNum === 6) {
+            // Void: dark nebula clouds
+            for (let i = 0; i < 25; i++) {
+                bgStatic.fillStyle(
+                    Phaser.Display.Color.HSLToColor((hue + Math.random() * 40 - 20) / 360, 0.3, 0.08).color,
+                    0.15 + Math.random() * 0.15
+                );
+                bgStatic.fillEllipse(
+                    Math.random() * CFG.W, Math.random() * CFG.H,
+                    120 + Math.random() * 250, 50 + Math.random() * 120
+                );
+            }
+        } else if (stageNum === 7) {
+            // Fortress: metal wall panels + warning lights
+            bgStatic.fillStyle(0x161a24, 1);
+            bgStatic.fillRect(0, 0, CFG.W, CFG.H);
+            bgStatic.lineStyle(1.5, 0x2a3050, 0.6);
+            for (let x = 0; x < CFG.W; x += 96) bgStatic.lineBetween(x, 0, x, CFG.H);
+            for (let y = 0; y < CFG.H; y += 72) bgStatic.lineBetween(0, y, CFG.W, y);
+            // Warning lights
+            for (let i = 0; i < 16; i++) {
+                bgStatic.fillStyle(0xff2222, 0.4 + Math.random() * 0.4);
+                bgStatic.fillCircle(Math.random() * CFG.W, Math.random() * CFG.H, 2.5);
+            }
+        } else if (stageNum === 1) {
+            // Space: distant planet
+            bgStatic.fillStyle(0x334488, 0.2);
+            bgStatic.fillEllipse(CFG.W * 0.78, CFG.H * 0.25, 240, 160);
+            bgStatic.fillStyle(0x6688cc, 0.35);
+            bgStatic.fillCircle(CFG.W * 0.78, CFG.H * 0.25, 50);
+            // Nebula wisps
+            for (let i = 0; i < 15; i++) {
+                bgStatic.fillStyle(
+                    Phaser.Display.Color.HSLToColor((hue + Math.random() * 30) / 360, 0.25, 0.1).color,
+                    0.08
+                );
+                bgStatic.fillEllipse(
+                    Math.random() * CFG.W, Math.random() * CFG.H,
+                    100 + Math.random() * 200, 30 + Math.random() * 80
+                );
+            }
+        }
+
+        // Layer 0 - deep bg stars (slowest)
         for (let i = 0; i < 80; i++) {
-            const starHue = (h + (Math.random() - 0.5) * 30) / 360;
+            const starHue = (hue + (Math.random() - 0.5) * 30) / 360;
             const s = this.add.circle(
                 Math.random() * CFG.W * 2, Math.random() * CFG.H,
                 0.5 + Math.random() * 1, Phaser.Display.Color.HSLToColor(starHue, 0.25, 0.3 + Math.random() * 0.2).color,
@@ -288,9 +396,9 @@ class GameScene extends Phaser.Scene {
             s._speed = 0.2 + Math.random() * 0.3;
             this.bgLayers.push(s);
         }
-        // Layer 1 - mid (medium speed)
+        // Layer 1 - mid stars (medium speed)
         for (let i = 0; i < 40; i++) {
-            const starHue = (h + (Math.random() - 0.5) * 20) / 360;
+            const starHue = (hue + (Math.random() - 0.5) * 20) / 360;
             const s = this.add.circle(
                 Math.random() * CFG.W * 2, Math.random() * CFG.H,
                 1 + Math.random() * 2, Phaser.Display.Color.HSLToColor(starHue, 0.3, 0.4 + Math.random() * 0.3).color,
@@ -299,7 +407,7 @@ class GameScene extends Phaser.Scene {
             s._speed = 0.6 + Math.random() * 0.8;
             this.bgLayers.push(s);
         }
-        // Layer 2 - near stars (fastest) — white with slight blue tint, reduced alpha
+        // Layer 2 - near stars (fastest)
         for (let i = 0; i < 25; i++) {
             const tint = Math.random() > 0.3 ? 0xffffff : 0xccddff;
             const s = this.add.circle(
@@ -308,6 +416,144 @@ class GameScene extends Phaser.Scene {
             ).setScrollFactor(0).setDepth(-2);
             s._speed = 1.2 + Math.random() * 1.5;
             this.bgLayers.push(s);
+        }
+
+        // Stage-specific floating particles (scroll with mid layer)
+        if (stageNum === 2) {
+            // Rising embers
+            for (let i = 0; i < 30; i++) {
+                const ember = this.add.circle(
+                    Math.random() * CFG.W * 2, CFG.H * 0.5 + Math.random() * CFG.H * 0.5,
+                    1 + Math.random() * 2.5, 0xff6622, 0.3 + Math.random() * 0.5
+                ).setScrollFactor(0).setDepth(-3);
+                ember._speed = 0.3 + Math.random() * 0.6;
+                ember._rise = 0.3 + Math.random() * 0.8;
+                this.bgLayers.push(ember);
+            }
+        } else if (stageNum === 4) {
+            // Floating ice particles
+            for (let i = 0; i < 35; i++) {
+                const ice = this.add.circle(
+                    Math.random() * CFG.W * 2, Math.random() * CFG.H,
+                    0.5 + Math.random() * 1.5, 0xccf0ff, 0.3 + Math.random() * 0.5
+                ).setScrollFactor(0).setDepth(-3);
+                ice._speed = 0.4 + Math.random() * 0.7;
+                this.bgLayers.push(ice);
+            }
+        } else if (stageNum === 6) {
+            // Purple wisps
+            for (let i = 0; i < 25; i++) {
+                const wisp = this.add.circle(
+                    Math.random() * CFG.W * 2, Math.random() * CFG.H,
+                    1 + Math.random() * 2, 0xaa55ff, 0.15 + Math.random() * 0.25
+                ).setScrollFactor(0).setDepth(-3);
+                wisp._speed = 0.2 + Math.random() * 0.5;
+                wisp._drift = Math.random() * 0.5;
+                this.bgLayers.push(wisp);
+            }
+        }
+    }
+
+    // ---- Terrain rendering ----
+    getTerrainAmplitude() {
+        const c = this.stageData.terrain.complexity;
+        if (c === 'heavy') return 55;
+        if (c === 'medium') return 35;
+        return 20;
+    }
+
+    drawTerrain() {
+        if (!this.terrainGfx) return;
+        const t = this.stageData.terrain;
+        if (!t.bottom && !t.top) return;
+
+        this.terrainGfx.clear();
+        const amp = this.getTerrainAmplitude();
+        const hue = this.stageData.bgHue;
+        const baseColor = Phaser.Display.Color.HSLToColor(hue / 360, 0.4, 0.18).color;
+        const highlightColor = Phaser.Display.Color.HSLToColor(hue / 360, 0.35, 0.25).color;
+        const step = 8;
+
+        if (t.bottom) {
+            // Bottom terrain
+            this.terrainGfx.fillStyle(baseColor, 1);
+            this.terrainGfx.beginPath();
+            this.terrainGfx.moveTo(0, CFG.H);
+            for (let x = 0; x <= CFG.W; x += step) {
+                const sx = x + this.terrainScroll;
+                const h = amp * (Math.sin(sx * 0.008) + Math.sin(sx * 0.019) * 0.5 + Math.sin(sx * 0.0035) * 0.3);
+                const baseY = CFG.H - 50 - amp + h;
+                this.terrainGfx.lineTo(x, baseY);
+            }
+            this.terrainGfx.lineTo(CFG.W, CFG.H);
+            this.terrainGfx.closePath();
+            this.terrainGfx.fillPath();
+            // Highlight edge
+            this.terrainGfx.lineStyle(2, highlightColor, 0.6);
+            this.terrainGfx.beginPath();
+            for (let x = 0; x <= CFG.W; x += step) {
+                const sx = x + this.terrainScroll;
+                const h = amp * (Math.sin(sx * 0.008) + Math.sin(sx * 0.019) * 0.5 + Math.sin(sx * 0.0035) * 0.3);
+                const baseY = CFG.H - 50 - amp + h;
+                if (x === 0) this.terrainGfx.moveTo(x, baseY);
+                else this.terrainGfx.lineTo(x, baseY);
+            }
+            this.terrainGfx.strokePath();
+        }
+
+        if (t.top) {
+            // Top terrain
+            this.terrainGfx.fillStyle(baseColor, 1);
+            this.terrainGfx.beginPath();
+            this.terrainGfx.moveTo(0, 0);
+            for (let x = 0; x <= CFG.W; x += step) {
+                const sx = x + this.terrainScroll + 500;
+                const h = amp * 0.8 * (Math.sin(sx * 0.007) + Math.sin(sx * 0.017) * 0.5 + Math.sin(sx * 0.004) * 0.3);
+                const baseY = 45 + amp * 0.8 + h;
+                this.terrainGfx.lineTo(x, baseY);
+            }
+            this.terrainGfx.lineTo(CFG.W, 0);
+            this.terrainGfx.closePath();
+            this.terrainGfx.fillPath();
+            // Highlight edge
+            this.terrainGfx.lineStyle(2, highlightColor, 0.6);
+            this.terrainGfx.beginPath();
+            for (let x = 0; x <= CFG.W; x += step) {
+                const sx = x + this.terrainScroll + 500;
+                const h = amp * 0.8 * (Math.sin(sx * 0.007) + Math.sin(sx * 0.017) * 0.5 + Math.sin(sx * 0.004) * 0.3);
+                const baseY = 45 + amp * 0.8 + h;
+                if (x === 0) this.terrainGfx.moveTo(x, baseY);
+                else this.terrainGfx.lineTo(x, baseY);
+            }
+            this.terrainGfx.strokePath();
+        }
+    }
+
+    getTerrainYBottom(x) {
+        const amp = this.getTerrainAmplitude();
+        const sx = x + this.terrainScroll;
+        const h = amp * (Math.sin(sx * 0.008) + Math.sin(sx * 0.019) * 0.5 + Math.sin(sx * 0.0035) * 0.3);
+        return CFG.H - 50 - amp + h;
+    }
+
+    getTerrainYTop(x) {
+        const amp = this.getTerrainAmplitude() * 0.8;
+        const sx = x + this.terrainScroll + 500;
+        const h = amp * (Math.sin(sx * 0.007) + Math.sin(sx * 0.017) * 0.5 + Math.sin(sx * 0.004) * 0.3);
+        return 45 + amp + h;
+    }
+
+    checkTerrainCollision() {
+        if (this.playerDead || this.invulnTimer > 0) return;
+        const t = this.stageData.terrain;
+        const px = this.player.x;
+        const py = this.player.y;
+        if (t.bottom && py > this.getTerrainYBottom(px) - 6) {
+            this.playerDie();
+            return;
+        }
+        if (t.top && py < this.getTerrainYTop(px) + 6) {
+            this.playerDie();
         }
     }
 
@@ -492,8 +738,24 @@ class GameScene extends Phaser.Scene {
         // Background parallax
         this.bgLayers.forEach(s => {
             s.x -= s._speed;
+            if (s._rise) {
+                s.y -= s._rise;
+                if (s.y < -10) { s.y = CFG.H + 10; s.x = Math.random() * CFG.W; }
+            }
+            if (s._drift) {
+                s.y += Math.sin(this.gameTime * 0.001 + s.x) * s._drift;
+            }
             if (s.x < -10) s.x = CFG.W + 10 + Math.random() * 50;
         });
+
+        // Terrain scroll + render
+        if (!this.bossActive) {
+            this.terrainScroll += CFG.SCROLL_SPEED;
+        }
+        this.drawTerrain();
+        if (!this.playerDead) {
+            this.checkTerrainCollision();
+        }
 
         // Screen shake decay
         if (this.shakeMag > 0) {
@@ -549,7 +811,7 @@ class GameScene extends Phaser.Scene {
             this.shootTimer -= delta;
             if (this.keyZ.isDown && this.shootTimer <= 0) {
                 this.fireWeapon();
-                this.shootTimer = this.powerBar.hasLaser ? 200 : 100;
+                this.shootTimer = this.powerBar.hasLaser ? 180 : 75;
             }
 
             // ---- Missiles (separate key) ----
@@ -960,7 +1222,7 @@ class GameScene extends Phaser.Scene {
         capsule.setActive(false).setVisible(false);
         capsule.body.stop();
         this.powerBar.advance();
-        sfx.powerUp();
+        sfx.capsuleCollect();
         this.floatText(capsule.x, capsule.y, 'POWER', '#cc3300');
         const em = this.add.particles(capsule.x, capsule.y, 'spark', {
             speed: { min: 40, max: 120 },
@@ -992,6 +1254,11 @@ class GameScene extends Phaser.Scene {
                 this.powerBar.hasShield = false;
             }
             this.shakeMag = 3;
+            // Shield absorb flash
+            this.player.setTintFill(0x88ccff);
+            this.time.delayedCall(60, () => {
+                if (this.player && this.player.active) this.player.clearTint();
+            });
             return;
         }
         this.playerDie();
@@ -1000,13 +1267,51 @@ class GameScene extends Phaser.Scene {
     playerDie() {
         if (this.playerDead || this.stageClear || this.bossDefeated) return;
         this.playerDead = true;
-        this.player.setVisible(false);
         this.player.body.stop();
         this.engineParticles.stop();
-        this.spawnExplosion(this.player.x, this.player.y, true);
-        this.spawnDeathParticles(this.player.x, this.player.y, 210);
+
+        const px = this.player.x;
+        const py = this.player.y;
+
+        // White flash + scale-up death animation
+        this.player.setTintFill(0xffffff);
+        this.tweens.add({
+            targets: this.player,
+            scaleX: 2.0,
+            scaleY: 2.0,
+            alpha: 0,
+            duration: 250,
+            ease: 'Quad.Out',
+            onComplete: () => {
+                this.player.clearTint();
+                this.player.setVisible(false);
+                this.player.setAlpha(1);
+                this.player.setScale(1);
+            }
+        });
+
+        // Debris particles flying outward
+        for (let i = 0; i < 16; i++) {
+            const angle = (i / 16) * Math.PI * 2;
+            const speed = 60 + Math.random() * 120;
+            const debris = this.add.circle(px, py, 1.5 + Math.random() * 3, 0xffffff, 1).setDepth(25);
+            this.tweens.add({
+                targets: debris,
+                x: px + Math.cos(angle) * speed,
+                y: py + Math.sin(angle) * speed,
+                alpha: 0,
+                scale: { from: 1, to: 0.2 },
+                duration: 200 + Math.random() * 200,
+                ease: 'Cubic.Out',
+                onComplete: () => debris.destroy()
+            });
+        }
+
+        this.spawnExplosion(px, py, true);
+        this.spawnDeathParticles(px, py, 210);
         sfx.death();
-        this.shakeMag = 12;
+        this.shakeMag = 14;
+        this.cameras.main.flash(150, 255, 255, 255, true);
         this.powerBar.reset();
         this.clearOptions();
         this.shieldSprite.setVisible(false);
@@ -1025,6 +1330,8 @@ class GameScene extends Phaser.Scene {
                 this.playerDead = false;
                 this.player.setPosition(80, CFG.H / 2);
                 this.player.setVisible(true);
+                this.player.setScale(1);
+                this.player.setAlpha(1);
                 this.invulnTimer = CFG.INVULN_TIME;
                 this.engineParticles.start();
             });
@@ -1059,23 +1366,60 @@ class GameScene extends Phaser.Scene {
         this.bossPhaseIdx = 0;
         this.bossShootTimer = 0;
         this.bossBulletAngle = 0;
-        this.bossNameText.setText(bd.name);
         sfx.bossWarning();
-        this.boss = this.physics.add.sprite(CFG.W + bd.w, CFG.H / 2, `boss_${bd.id}_0`);
-        this.boss.setDepth(6);
-        this.boss.body.setSize(bd.w * 0.7, bd.h * 0.7);
-        this.boss.bossData = bd;
-        this.boss.frameIdx = 0;
-        this.boss.frameTimer = 0;
-        this.boss.moveAngle = 0;
+
+        // --- WARNING overlay ---
+        const warnBg = this.add.rectangle(CFG.W / 2, CFG.H / 2, CFG.W, CFG.H, 0x000000, 0)
+            .setDepth(500).setScrollFactor(0);
+        const stripes = this.add.graphics().setDepth(501).setScrollFactor(0);
+        for (let y = 0; y < CFG.H; y += 16) {
+            const isRed = Math.floor(y / 16) % 2 === 0;
+            stripes.fillStyle(isRed ? 0xff0000 : 0x220000, isRed ? 0.15 : 0.05);
+            stripes.fillRect(0, y, CFG.W, 16);
+        }
+        const warnText = this.add.text(CFG.W / 2, CFG.H / 2 - 20, 'WARNING', {
+            fontSize: '72px', fontFamily: 'Impact, sans-serif',
+            fill: '#ff2222', stroke: '#ffffff', strokeThickness: 4
+        }).setOrigin(0.5).setDepth(502).setScrollFactor(0);
+        const warnName = this.add.text(CFG.W / 2, CFG.H / 2 + 40, bd.name, {
+            fontSize: '24px', fontFamily: 'Impact, sans-serif',
+            fill: '#ff8888', stroke: '#000000', strokeThickness: 3
+        }).setOrigin(0.5).setDepth(502).setScrollFactor(0);
+        // Flash the warning text
         this.tweens.add({
-            targets: this.boss,
-            x: CFG.W - bd.w / 2 - 80,
-            duration: 2000,
-            ease: 'Sine.easeOut'
+            targets: warnText, alpha: { from: 1, to: 0.15 },
+            duration: 100, yoyo: true, repeat: 8
         });
-        this.physics.add.overlap(this.playerBullets, this.boss, this.bulletHitBoss, null, this);
-        this.physics.add.overlap(this.player, this.boss, this.playerHitEnemy, null, this);
+        this.tweens.add({
+            targets: stripes, alpha: { from: 0.8, to: 0.2 },
+            duration: 120, yoyo: true, repeat: 7
+        });
+
+        // After warning, spawn boss
+        this.time.delayedCall(1800, () => {
+            this.tweens.add({
+                targets: [warnText, warnName, stripes, warnBg],
+                alpha: 0, duration: 300,
+                onComplete: () => { warnText.destroy(); warnName.destroy(); stripes.destroy(); warnBg.destroy(); }
+            });
+
+            this.bossNameText.setText(bd.name);
+            this.boss = this.physics.add.sprite(CFG.W + bd.w, CFG.H / 2, `boss_${bd.id}_0`);
+            this.boss.setDepth(6);
+            this.boss.body.setSize(bd.w * 0.7, bd.h * 0.7);
+            this.boss.bossData = bd;
+            this.boss.frameIdx = 0;
+            this.boss.frameTimer = 0;
+            this.boss.moveAngle = 0;
+            this.tweens.add({
+                targets: this.boss,
+                x: CFG.W - bd.w / 2 - 80,
+                duration: 2000,
+                ease: 'Sine.easeOut'
+            });
+            this.physics.add.overlap(this.playerBullets, this.boss, this.bulletHitBoss, null, this);
+            this.physics.add.overlap(this.player, this.boss, this.playerHitEnemy, null, this);
+        });
     }
 
     updateBoss(time, delta) {
@@ -1091,10 +1435,10 @@ class GameScene extends Phaser.Scene {
         }
 
         const hpRatio = this.bossHP / this.bossMaxHP;
-        // Pick lowest-threshold phase that hpRatio qualifies for
+        // Pick the deepest phase whose threshold the boss has reached
         let phase = bd.phases[0];
         for (const p of bd.phases) {
-            if (hpRatio <= p.at && p.at <= phase.at) {
+            if (hpRatio <= p.at) {
                 phase = p;
             }
         }
